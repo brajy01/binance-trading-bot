@@ -1,6 +1,6 @@
 flask
 requests
-binance
+python-binance
 python-dotenv
 gunicorn
 cryptography
