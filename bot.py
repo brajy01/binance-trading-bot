@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import csv
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 load_dotenv()
@@ -18,7 +19,7 @@ client = Client(API_KEY, API_SECRET)
 # Chemin du fichier log
 CSV_FILE = "trades_log.csv"
 
-# Création du CSV si pas encore là
+# Création du fichier CSV si inexistant
 if not os.path.exists(CSV_FILE):
     with open(CSV_FILE, mode="w", newline="") as file:
         writer = csv.writer(file)
@@ -55,15 +56,13 @@ def webhook():
         print("✅ Order executed")
 
         # Get exit price after 5 secondes (simulation clôture)
-        import time
         time.sleep(5)
         exit_price = float(client.get_symbol_ticker(symbol=symbol)["price"])
 
-        # PnL brut (pour simplifier, on suppose tout en USDT)
+        # PnL brut (USDT)
         pnl = (exit_price - entry_price) * qty if action == "buy" else (entry_price - exit_price) * qty
         pnl_percent = (pnl / (entry_price * qty)) * 100
 
-        # Log dans le CSV
         log_trade(symbol, action, qty, entry_price, exit_price, pnl, pnl_percent)
 
         return jsonify({"status": "executed", "entry": entry_price, "exit": exit_price, "pnl": pnl})
@@ -80,3 +79,7 @@ def log_trade(symbol, side, qty, entry_price, exit_price, pnl_usd, pnl_percent):
             symbol, side, qty, entry_price, exit_price,
             round(pnl_usd, 2), round(pnl_percent, 2)
         ])
+
+# 🔥 Lancement du serveur Flask
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
