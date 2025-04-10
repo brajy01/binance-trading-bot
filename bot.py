@@ -1,64 +1,38 @@
 from flask import Flask, request, jsonify
-import requests
 import os
-import time
-import hmac
-import hashlib
+import requests
+from binance.client import Client
 
 app = Flask(__name__)
 
-# === Configuration Binance ===
-API_KEY = os.getenv("BINANCE_API_KEY", "TEST")
-API_SECRET = os.getenv("BINANCE_API_SECRET", "TEST")
-BASE_URL = "https://api.binance.com"
+API_KEY = os.getenv("BINANCE_API_KEY")
+API_SECRET = os.getenv("BINANCE_API_SECRET")
+SIMULATE = os.getenv("SIMULATE", "true").lower() == "true"
 
-# === Envoi de la requête à Binance ===
-def place_order(symbol, side, qty):
-    if os.getenv("SIMULATE") == "true":
-        print(f"[SIMULATION] {side.upper()} {qty} {symbol}")
-        return {"simulated": True, "side": side, "qty": qty, "symbol": symbol}
+client = Client(API_KEY, API_SECRET)
 
-    endpoint = "/api/v3/order"
-    url = BASE_URL + endpoint
-
-    timestamp = int(time.time() * 1000)
-    params = {
-        "symbol": symbol,
-        "side": side.upper(),
-        "type": "MARKET",
-        "quantity": qty,
-        "timestamp": timestamp
-    }
-
-    query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-    signature = hmac.new(API_SECRET.encode(), query_string.encode(), hashlib.sha256).hexdigest()
-    params["signature"] = signature
-
-    headers = {
-        "X-MBX-APIKEY": API_KEY
-    }
-
-    response = requests.post(url, headers=headers, params=params)
-    return response.json()
-
-# === Webhook endpoint ===
-@app.route("/webhook", methods=["POST"])
+@app.route("/", methods=["POST"])
 def webhook():
-    data = request.json
-    try:
-        symbol = data.get("symbol")
-        action = data.get("action")
-        qty = float(data.get("qty", 0.01))
+    data = request.get_json()
 
-        if symbol and action in ["buy", "sell"]:
-            result = place_order(symbol, action, qty)
-            return jsonify({"status": "success", "response": result})
+    action = data.get("action")
+    symbol = data.get("symbol")
+    qty = float(data.get("qty"))
+
+    if SIMULATE:
+        print(f"🔁 [SIMULATION] {action.upper()} {qty} {symbol}")
+        return jsonify({"status": "simulated", "action": action, "symbol": symbol, "qty": qty})
+
+    try:
+        if action == "buy":
+            order = client.order_market_buy(symbol=symbol, quantity=qty)
+        elif action == "sell":
+            order = client.order_market_sell(symbol=symbol, quantity=qty)
         else:
-            return jsonify({"status": "error", "message": "Invalid data"}), 400
+            return jsonify({"error": "Invalid action"})
+
+        return jsonify({"status": "executed", "order": order})
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# === Lancement ===
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+        print("❌ ERROR:", str(e))
+        return jsonify({"error": str(e)})
