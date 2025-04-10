@@ -4,3 +4,4 @@ binance
 python-dotenv
 gunicorn
 cryptography
+aiohttp
