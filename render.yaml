@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: binance-trading-bot
+    env: python
+    buildCommand: ""
+    startCommand: "gunicorn bot:app"
+    envVars:
+      - key: BINANCE_API_KEY
+        value: replace_me
+      - key: BINANCE_API_SECRET
+        value: replace_me
+      - key: SIMULATE
+        value: "true"
