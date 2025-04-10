@@ -3,3 +3,4 @@ requests
 binance
 python-dotenv
 gunicorn
+cryptography
